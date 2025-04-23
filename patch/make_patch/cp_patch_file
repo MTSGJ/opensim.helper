@@ -1,0 +1,39 @@
+cp -f ../../OpenSim/Region/Physics/Manager/PhysicsScene.cs   opensim/OpenSim/Region/Physics/Manager/PhysicsScene.cs
+#cp -f ../../OpenSim/Region/Physics/OdePlugin/OdePlugin.cs    opensim/OpenSim/Region/Physics/OdePlugin/OdePlugin.cs
+cp -f ../../OpenSim/Region/Physics/OdePlugin/ODECharacter.cs opensim/OpenSim/Region/Physics/OdePlugin/ODECharacter.cs
+cp -f ../../OpenSim/Region/Physics/OdePlugin/OdeScene.cs 	 opensim/OpenSim/Region/Physics/OdePlugin/OdeScene.cs
+
+cp -f ../../OpenSim/Region/Framework/Scenes/Scene.cs       opensim/OpenSim/Region/Framework/Scenes/Scene.cs
+cp -f ../../OpenSim/Region/Framework/Scenes/ScenePresence.cs opensim/OpenSim/Region/Framework/Scenes/ScenePresence.cs
+cp -f ../../OpenSim/Region/Framework/Scenes/SceneGraph.cs opensim/OpenSim/Region/Framework/Scenes/SceneGraph.cs
+cp -f ../../OpenSim/Region/Framework/Scenes/SceneObjectPart.cs opensim/OpenSim/Region/Framework/Scenes/SceneObjectPart.cs
+cp -f ../../OpenSim/Region/Framework/Scenes/Scene.Inventory.cs opensim/OpenSim/Region/Framework/Scenes/Scene.Inventory.cs
+#cp -f ../../OpenSim/Region/ClientStack/LindenUDP/LLUDPServer.cs opensim/OpenSim/Region/ClientStack/LindenUDP/LLUDPServer.cs
+
+cp -f ../../OpenSim/Region/ScriptEngine/Shared/Api/Implementation/LSL_Api.cs opensim/OpenSim/Region/ScriptEngine/Shared/Api/Implementation/LSL_Api.cs
+cp -f ../../OpenSim/Region/ScriptEngine/Shared/Api/Interface/ILSL_Api.cs opensim/OpenSim/Region/ScriptEngine/Shared/Api/Interface/ILSL_Api.cs
+cp -f ../../OpenSim/Region/ScriptEngine/Shared/Api/Runtime/LSL_Stub.cs opensim/OpenSim/Region/ScriptEngine/Shared/Api/Runtime/LSL_Stub.cs
+
+cp -f ../../OpenSim/Region/ScriptEngine/Shared/Api/Implementation/OSSL_Api.cs opensim/OpenSim/Region/ScriptEngine/Shared/Api/Implementation/OSSL_Api.cs
+cp -f ../../OpenSim/Region/ScriptEngine/Shared/Api/Interface/IOSSL_Api.cs opensim/OpenSim/Region/ScriptEngine/Shared/Api/Interface/IOSSL_Api.cs
+cp -f ../../OpenSim/Region/ScriptEngine/Shared/Api/Runtime/OSSL_Stub.cs opensim/OpenSim/Region/ScriptEngine/Shared/Api/Runtime/OSSL_Stub.cs
+
+if [ -f ../../OpenSim/Region/CoreModules/Scripting/BitmapRender/BitmapRenderModule.cs ];then
+	cp -f ../../OpenSim/Region/CoreModules/Scripting/BitmapRender/BitmapRenderModule.cs opensim/OpenSim/Region/CoreModules/Scripting/BitmapRender/BitmapRenderModule.cs 
+fi
+
+#cp -f ../../OpenSim/Region/ClientStack/LindenUDP/LLPacketHandler.cs opensim/OpenSim/Region/ClientStack/LindenUDP/LLPacketHandler.cs
+#cp -f ../../OpenSim/Framework/Capabilities/Caps.cs opensim/OpenSim/Framework/Capabilities/Caps.cs
+#cp -f ../../OpenMetaverse.dll.config opensim/bin/OpenMetaverse.dll.config
+
+cp -f ../../OpenSim/Services/AuthenticationService/PasswordAuthenticationService.cs opensim/OpenSim/Services/AuthenticationService/PasswordAuthenticationService.cs
+
+# 0.7
+cp -f ../../OpenSim/Services/PresenceService/PresenceService.cs opensim/OpenSim/Services/PresenceService/PresenceService.cs
+cp -f ../../OpenSim/Services/Interfaces/IGridUserService.cs opensim/OpenSim/Services/Interfaces/IGridUserService.cs
+cp -f ../../OpenSim/Region/CoreModules/World/WorldMap/WorldMapModule.cs opensim/OpenSim/Region/CoreModules/World/WorldMap/WorldMapModule.cs
+cp -f ../../OpenSim/Region/Physics/Meshing/Meshmerizer.cs opensim/OpenSim/Region/Physics/Meshing/Meshmerizer.cs
+
+cp -f ../../OpenSim/ConsoleClient/ConsoleClient.cs opensim/OpenSim/ConsoleClient/ConsoleClient.cs
+
+cp -f ../../OpenSim/Region/CoreModules/Avatar/InstantMessage/OfflineMessageModule.cs opensim/OpenSim/Region/CoreModules/Avatar/InstantMessage/OfflineMessageModule.cs

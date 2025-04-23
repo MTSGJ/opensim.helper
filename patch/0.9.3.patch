@@ -1,0 +1,82 @@
+diff -Nur OpenSim-/Region/CoreModules/World/Land/LandManagementModule.cs OpenSim/Region/CoreModules/World/Land/LandManagementModule.cs
+--- OpenSim-/Region/CoreModules/World/Land/LandManagementModule.cs	2025-04-06 17:46:12.678668450 +0900
++++ OpenSim/Region/CoreModules/World/Land/LandManagementModule.cs	2025-04-23 12:07:47.139700419 +0900
+@@ -530,6 +530,10 @@
+             if (avatar.IsChildAgent || avatar.IsNPC)
+                 return;
+ 
++            // by Fumi.Hax
++            ILandObject over = GetLandObject(avatar.AbsolutePosition.X, avatar.AbsolutePosition.Y);
++            SendLandUpdate(avatar, over);
++
+             if (m_showBansLines && !m_scene.RegionInfo.EstateSettings.TaxFree)
+                 SendOutNearestBanLine(avatar.ControllingClient);
+         }
+diff -Nur OpenSim-/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs OpenSim/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs
+--- OpenSim-/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs	2025-04-06 17:46:12.730668642 +0900
++++ OpenSim/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs	2025-04-23 12:08:43.992929215 +0900
+@@ -1154,7 +1154,8 @@
+ 
+             using (Stream stream = request.GetRequestStream())
+             {
+-                using (XmlTextWriter xml = new XmlTextWriter(stream, Encoding.ASCII))
++                //using (XmlTextWriter xml = new XmlTextWriter(stream, Encoding.ASCII))
++                using (XmlTextWriter xml = new XmlTextWriter(stream, Encoding.UTF8))    // by Fumi.Hax
+                 {
+                     _serializer.Serialize(xml, this);
+                     xml.Flush();
+diff -Nur OpenSim-/Region/OptionalModules/UserStatistics/WebStatsModule.cs OpenSim/Region/OptionalModules/UserStatistics/WebStatsModule.cs
+--- OpenSim-/Region/OptionalModules/UserStatistics/WebStatsModule.cs	2025-04-06 17:46:12.738668672 +0900
++++ OpenSim/Region/OptionalModules/UserStatistics/WebStatsModule.cs	2025-04-23 12:09:51.389200436 +0900
+@@ -144,6 +144,9 @@
+                 updateLogMod = m_scenes.Count * 2;
+ 
+                 m_simstatsCounters.Add(scene.RegionInfo.RegionID, new USimStatsData(scene.RegionInfo.RegionID));
++                // Fumi.Hax
++                if (!m_simstatsCounters.ContainsKey(scene.RegionInfo.RegionID))
++                    m_simstatsCounters.Add(scene.RegionInfo.RegionID, new USimStatsData(scene.RegionInfo.RegionID));
+ 
+                 scene.EventManager.OnRegisterCaps += OnRegisterCaps;
+                 scene.EventManager.OnDeregisterCaps += OnDeRegisterCaps;
+@@ -1201,4 +1204,4 @@
+             m_scriptLinesPerSecond = stats.StatsValues[(int)StatsIndex.LSLScriptLinesPerSecond];
+         }
+     }
+-}
+\ No newline at end of file
++}
+diff -Nur OpenSim-/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs OpenSim/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs
+--- OpenSim-/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs	2025-04-06 17:46:12.793668876 +0900
++++ OpenSim/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs	2025-04-23 12:10:38.644390656 +0900
+@@ -106,6 +106,8 @@
+                 {
+                     string [] nvp = s.Split(new Char [] {'='});
+                     bodyParams.Add(HttpUtility.UrlDecode(nvp[0]), HttpUtility.UrlDecode(nvp[1]));
++                    if (!bodyParams.ContainsKey(nvp[0]))  // by Fumi.Hax
++                        bodyParams.Add(HttpUtility.UrlDecode(nvp[0]), HttpUtility.UrlDecode(nvp[1]));
+                 }
+             }
+ 
+diff -Nur OpenSim-/Framework/WebUtil.cs OpenSim/Framework/WebUtil.cs
+--- OpenSim-/Framework/WebUtil.cs	2025-04-06 17:46:12.615668216 +0900
++++ OpenSim/Framework/WebUtil.cs	2025-04-23 10:29:34.961033168 +0900
+@@ -1423,6 +1423,9 @@
+                 responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
+                 responseMessage.EnsureSuccessStatusCode();
+ 
++                // Instructions for synchronization by Fumi.Hax
++                string dummy = responseMessage.Content.ReadAsStringAsync().Result;
++
+                 int rcvlen = 0;
+                 if ((responseMessage.Content.Headers.ContentLength is long contentLength) && contentLength != 0)
+                 {
+@@ -1517,6 +1520,9 @@
+                 responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
+                 responseMessage.EnsureSuccessStatusCode();
+ 
++                // Instructions for synchronization by Fumi.Hax
++                string dummy = responseMessage.Content.ReadAsStringAsync().Result;
++
+                 int rcvlen = 0;
+                 if ((responseMessage.Content.Headers.ContentLength is long contentLength) && contentLength != 0)
+                 {

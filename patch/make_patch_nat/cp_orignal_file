@@ -1,0 +1,28 @@
+#!/bin/bash
+
+FRM=../..
+TO=opensim-
+
+
+
+cp_file()
+{
+	read FLNM
+	while [ "$FLNM" != "" ]; do
+		echo $FLNM
+		cp -f $FRM/$FLNM $TO/$FLNM
+		read FLNM
+    done
+}
+
+if [ $# -lt 1 ]; then
+    echo Usage $0 file
+    exit
+fi
+
+if [ ! -f $1 ]; then
+    echo Usage $0 file
+    exit
+fi
+
+cat $1 | cp_file

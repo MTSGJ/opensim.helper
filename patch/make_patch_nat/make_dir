@@ -1,0 +1,28 @@
+
+mkdir -p opensim/OpenSim/Region/Framework/Scenes/Tests
+mkdir -p opensim/OpenSim/Services/Interfaces
+mkdir -p opensim/OpenSim/Data/SQLite
+mkdir -p opensim/OpenSim/Data/MySQL
+mkdir -p opensim/OpenSim/Data/MSSQL
+mkdir -p opensim/OpenSim/Framework/Communications/Clients
+mkdir -p opensim/OpenSim/Framework/Communications/Tests
+mkdir -p opensim/OpenSim/Grid/MessagingServer.Modules
+mkdir -p opensim/OpenSim/Grid/GridServer.Modules
+mkdir -p opensim/OpenSim/Tests/Common/Setup
+mkdir -p opensim/OpenSim/Grid/UserServer.Modules
+mkdir -p opensim/OpenSim/ApplicationPlugins/RemoteController
+mkdir -p opensim/OpenSim/Client/Linden
+
+mkdir -p opensim-/OpenSim/Region/Framework/Scenes/Tests
+mkdir -p opensim-/OpenSim/Services/Interfaces
+mkdir -p opensim-/OpenSim/Data/SQLite
+mkdir -p opensim-/OpenSim/Data/MySQL
+mkdir -p opensim-/OpenSim/Data/MSSQL
+mkdir -p opensim-/OpenSim/Framework/Communications/Clients
+mkdir -p opensim-/OpenSim/Framework/Communications/Tests
+mkdir -p opensim-/OpenSim/Grid/MessagingServer.Modules
+mkdir -p opensim-/OpenSim/Grid/GridServer.Modules
+mkdir -p opensim-/OpenSim/Tests/Common/Setup
+mkdir -p opensim-/OpenSim/Grid/UserServer.Modules
+mkdir -p opensim-/OpenSim/ApplicationPlugins/RemoteController
+mkdir -p opensim-/OpenSim/Client/Linden

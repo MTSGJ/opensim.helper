@@ -1,0 +1,716 @@
+diff -Nur OpenSim-/Framework/NetworkUtil.cs OpenSim/Framework/NetworkUtil.cs
+--- OpenSim-/Framework/NetworkUtil.cs	2025-04-06 17:46:12.573668061 +0900
++++ OpenSim/Framework/NetworkUtil.cs	2025-04-23 13:30:36.097688708 +0900
+@@ -60,6 +60,9 @@
+         // IPv4Address, Subnet
+         static readonly Dictionary<IPAddress,IPAddress> m_subnets = new Dictionary<IPAddress, IPAddress>();
+ 
++        // IPv4 Private Address // by Fumi.Hax for NAPT
++        static readonly Dictionary<IPAddress,IPAddress> m_private = new Dictionary<IPAddress, IPAddress>();
++
+         public static IPAddress GetIPFor(IPAddress user, IPAddress simulator)
+         {
+             if (m_disabled)
+@@ -191,9 +194,18 @@
+                     {
+                         if (address.Address.AddressFamily == AddressFamily.InterNetwork)
+                         {
+-                            if (address.IPv4Mask != null)
++                            // by Fumi.Hax for NAPT
++                            try
++                            {
++                                if (address.IPv4Mask != null)
++                                {
++                                    m_subnets.Add(address.Address, address.IPv4Mask);
++                                }
++                            }
++                            catch (NotImplementedException)
+                             {
+-                                m_subnets.Add(address.Address, address.IPv4Mask);
++                                //m_subnets.Add(address.Address, address.IPv4Mask);
++                                m_subnets.Add(address.Address, IPAddress.Parse("255.255.255.0"));
+                             }
+                         }
+                     }
+@@ -203,6 +215,11 @@
+             {
+                 // Mono Sucks.
+             }
++
++            // by Fumi.Hax for NAPT
++            m_private.Add(IPAddress.Parse("10.0.0.0"),    IPAddress.Parse("255.0.0.0"));
++            m_private.Add(IPAddress.Parse("172.16.0.0"),  IPAddress.Parse("255.240.0.0"));
++            m_private.Add(IPAddress.Parse("192.168.0.0"), IPAddress.Parse("255.255.0.0"));
+         }
+ 
+         public static IPAddress GetIPFor(IPEndPoint user, string defaultHostname)
+@@ -246,5 +263,117 @@
+             return defaultHostname;
+         }
+ 
++        // by Fumi.Hax for NAPT
++        public static IPAddress GetIPfromString(string str)
++        {
++            IPAddress ip = null;
++
++            if (str=="")
++            {
++                ip = IPAddress.Parse("0.0.0.0");
++                return ip;
++            }
++
++            if (IPAddress.TryParse(str, out ip))
++            {
++                return ip;
++            }
++
++            try
++            {
++                foreach (IPAddress host in Dns.GetHostAddresses(str))
++                {
++                    if (host.AddressFamily==AddressFamily.InterNetwork)
++                    {
++                        return host;
++                    }
++                }
++            }
++            catch (System.Net.Sockets.SocketException)
++            {
++                ip = IPAddress.Parse("0.0.0.0");
++            }
++
++            return ip;
++        }
++
++        // by Fumi.Hax for NAPT
++        public static IPAddress GetEffectiveIP(IPAddress viewer, IPAddress internalIP, IPAddress externalIP, IPAddress myExternalIP)
++        {
++            if (internalIP.Equals(externalIP)) return externalIP;           // Target is outside of NAPT
++
++            if (viewer.Equals(externalIP))                                  // Target is local with viewer
++            {
++                m_log.Info("[NetworkUtil.GetEffectiveIP] Local LAN[0] user detected, sending them '" + internalIP.ToString() + "'");
++                return internalIP;
++            }
++
++            if (IsInternalSubnet(viewer))                                   // Viewer is inside
++            {
++                if (myExternalIP!=null && !myExternalIP.Equals(externalIP)) // Target is outside
++                {
++                    m_log.Info("[NetworkUtil.GetEffectiveIP] Remote LAN[0] user detected, sending them '" + externalIP.ToString() + "'");
++                    return externalIP;
++                }
++                m_log.Info("[NetworkUtil.GetEffectiveIP] Local LAN[1] user detected, sending them '" + internalIP.ToString() + "'");
++                return internalIP;
++            }
++
++            m_log.Info("[NetworkUtil.GetEffectiveIP] Remote LAN[1] user detected, sending them '" + externalIP.ToString() + "'");
++            return externalIP;
++        }
++
++        // by Fumi.Hax for NAPT
++        public static bool IsInternalSubnet(IPAddress address)
++        {
++            // Same as own IP
++            foreach (IPAddress host in Dns.GetHostAddresses(Dns.GetHostName()))
++            {
++                if (host.Equals(address) && host.AddressFamily==AddressFamily.InterNetwork) return true;
++            }
++
++            if (IsSameNetwork(address, m_subnets)) return true;
++            if (IsSameNetwork(address, m_private)) return true;
++
++            return false;
++        }
++
++        // by Fumi.Hax for NAPT
++        public static bool IsPrivateSubnet(IPAddress address)
++        {
++            if (IsSameNetwork(address, m_private)) return true;
++
++            return false;
++        }
++
++        // by Fumi.Hax for NAPT
++        public static bool IsSameNetwork(IPAddress address, Dictionary<IPAddress,IPAddress> subnets)
++        {
++            // Check for same LAN segment
++            byte[] destBytes = address.GetAddressBytes();
++
++            foreach (KeyValuePair<IPAddress, IPAddress> subnet in subnets)
++            {
++                if (subnet.Key.AddressFamily != AddressFamily.InterNetwork) continue;
++
++                byte[] subnetBytes = subnet.Value.GetAddressBytes();
++                byte[] localBytes  = subnet.Key.GetAddressBytes();
++
++                if (subnetBytes.Length!=destBytes.Length || subnetBytes.Length!=localBytes.Length) continue;
++
++                bool samenet = true;
++                for (int i=0; i<subnetBytes.Length; i++)
++                {
++                    if ((localBytes[i] & subnetBytes[i]) != (destBytes[i] & subnetBytes[i]))
++                    {
++                        samenet = false;
++                        break;
++                    }
++                }
++                if (samenet) return true;
++            }
++
++            return false;
++        }
+     }
+ }
+diff -Nur OpenSim-/Framework/RegionInfo.cs OpenSim/Framework/RegionInfo.cs
+--- OpenSim-/Framework/RegionInfo.cs	2025-04-22 16:03:10.379942272 +0900
++++ OpenSim/Framework/RegionInfo.cs	2025-04-23 13:36:38.406153192 +0900
+@@ -81,6 +81,7 @@
+         protected string m_serverURI;
+         protected string m_regionName = String.Empty;
+         protected string m_externalHostName;
++        protected IPAddress m_internalIPAddress = null;      // by Fumi.Hax for NAPT
+         protected IPEndPoint m_internalEndPoint;
+         protected uint m_remotingPort;
+         public UUID RegionID = UUID.Zero;
+@@ -197,7 +198,9 @@
+             m_serverURI = string.Empty;
+         }
+ 
+-        public RegionInfo(uint legacyRegionLocX, uint legacyRegionLocY, IPEndPoint internalEndPoint, string externalUri)
++        // by Fumi.Hax for NAPT
++        //public RegionInfo(uint legacyRegionLocX, uint legacyRegionLocY, IPEndPoint internalEndPoint, string externalUri)
++        public RegionInfo(uint legacyRegionLocX, uint legacyRegionLocY, IPEndPoint internalEndPoint, string externalUri, IPAddress internalIP=null)
+         {
+             RegionLocX = legacyRegionLocX;
+             RegionLocY = legacyRegionLocY;
+@@ -206,6 +209,8 @@
+             m_internalEndPoint = internalEndPoint;
+             m_externalHostName = externalUri;
+             m_serverURI = string.Empty;
++            if (internalIP==null) internalIP = NetworkUtil.GetIPfromString(m_externalHostName);   // by Fumi.Hax for NAPT
++            m_internalIPAddress = internalIP;
+         }
+ 
+         public RegionInfo()
+@@ -369,6 +374,13 @@
+             set { m_internalEndPoint = value; }
+         }
+ 
++        // by Fumi.Hax for NAPT
++        public IPAddress InternalIPAddress
++        {
++            get { return m_internalIPAddress; }
++            set { m_internalIPAddress = value; }
++        }
++
+         /// <summary>
+         /// The x co-ordinate of this region in map tiles (e.g. 1000).
+         /// Coordinate is scaled as world coordinates divided by the legacy region size
+@@ -546,6 +558,7 @@
+                 address = IPAddress.Parse(MainConsole.Instance.Prompt("Internal IP address", "0.0.0.0"));
+                 config.Set("InternalAddress", address.ToString());
+             }
++            m_internalIPAddress = address;    // by Fumi.Hax for NAPT
+ 
+             // InternalPort
+             //
+@@ -610,6 +623,9 @@
+                     m_externalHostName = addrs[0].ToString();
+             }
+ 
++            // by Fumi.Hax for NAPT
++            if (m_internalIPAddress.ToString()=="0.0.0.0") m_internalIPAddress = NetworkUtil.GetIPfromString(m_externalHostName);
++
+             // RegionType
+             m_regionType = config.GetString("RegionType", String.Empty);
+             allKeys.Remove("RegionType");
+@@ -1099,6 +1115,7 @@
+             if (!string.IsNullOrEmpty(RegionName))
+                 args["region_name"] = OSD.FromString(RegionName);
+             args["external_host_name"] = OSD.FromString(ExternalHostName);
++            args["internal_ip_address"] = OSD.FromString(InternalIPAddress.ToString());     // by Fumi.Hax for NAPT
+             args["http_port"] = OSD.FromString(HttpPort.ToString());
+             args["server_uri"] = OSD.FromString(ServerURI);
+ 
+@@ -1129,6 +1146,8 @@
+                 RegionName = args["region_name"].AsString();
+             if (args["external_host_name"] != null)
+                 ExternalHostName = args["external_host_name"].AsString();
++            if (args["internal_ip_address"] != null)
++                InternalIPAddress = IPAddress.Parse(args["internal_ip_address"].AsString());    // by Fumi.Hax for NAPT
+             if (args["http_port"] != null)
+                 UInt32.TryParse(args["http_port"].AsString(), out m_httpPort);
+             if (args["server_uri"] != null)
+@@ -1174,11 +1193,14 @@
+                 m_regionType = args["region_type"].AsString();
+         }
+ 
+-        public static RegionInfo Create(UUID regionID, string regionName, uint regX, uint regY, string externalHostName, uint httpPort, uint simPort, uint remotingPort, string serverURI)
++        // by Fumi.Hax for NAPT
++        //public static RegionInfo Create(UUID regionID, string regionName, uint regX, uint regY, string externalHostName, uint httpPort, uint simPort, uint remotingPort, string serverURI)
++        public static RegionInfo Create(UUID regionID, string regionName, uint regX, uint regY, string externalHostName, IPAddress internalIP, uint httpPort, uint simPort, uint remotingPort, string serverURI)
+         {
+             RegionInfo regionInfo;
+             IPEndPoint neighbourInternalEndPoint = new IPEndPoint(Util.GetHostFromDNS(externalHostName), (int)simPort);
+-            regionInfo = new RegionInfo(regX, regY, neighbourInternalEndPoint, externalHostName);
++            //regionInfo = new RegionInfo(regX, regY, neighbourInternalEndPoint, externalHostName);
++            regionInfo = new RegionInfo(regX, regY, neighbourInternalEndPoint, externalHostName, internalIP);   // by Fumi.Hax for NAPT
+             regionInfo.RemotingPort = remotingPort;
+             regionInfo.RemotingAddress = externalHostName;
+             regionInfo.HttpPort = httpPort;
+diff -Nur OpenSim-/Region/CoreModules/Avatar/Lure/HGLureModule.cs OpenSim/Region/CoreModules/Avatar/Lure/HGLureModule.cs
+--- OpenSim-/Region/CoreModules/Avatar/Lure/HGLureModule.cs	2025-04-06 17:46:12.652668353 +0900
++++ OpenSim/Region/CoreModules/Avatar/Lure/HGLureModule.cs	2025-04-23 12:41:38.108863007 +0900
+@@ -260,7 +260,8 @@
+ 
+                                 transferMod.DoTeleport(
+                                     sp, gatekeeper, finalDestination, im.Position + new Vector3(0.5f, 0.5f, 0f),
+-                                    Vector3.UnitX, teleportflags);
++                                    //Vector3.UnitX, teleportflags);
++                                    Vector3.UnitX, teleportflags, client);  // by Fumi.Hax for NAPT
+                             }
+                         }
+                         else
+diff -Nur OpenSim-/Region/CoreModules/Framework/EntityTransfer/EntityTransferModule.cs OpenSim/Region/CoreModules/Framework/EntityTransfer/EntityTransferModule.cs
+--- OpenSim-/Region/CoreModules/Framework/EntityTransfer/EntityTransferModule.cs	2025-04-22 16:03:10.382942283 +0900
++++ OpenSim/Region/CoreModules/Framework/EntityTransfer/EntityTransferModule.cs	2025-04-23 13:04:27.490361206 +0900
+@@ -412,7 +412,9 @@
+         }
+ 
+         // Attempt to teleport the ScenePresence to the specified position in the specified region (spec'ed by its handle).
+-        public void Teleport(ScenePresence sp, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags)
++        // by Fumi.Hax for NAPT
++        //public void Teleport(ScenePresence sp, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags)
++        public void Teleport(ScenePresence sp, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags, IClientAPI client)
+         {
+             UUID spUUID = sp.UUID;
+             if (m_scene.Permissions.IsGridGod(spUUID))
+@@ -458,7 +460,8 @@
+                     GridRegion finalDestination = null;
+                     try
+                     {
+-                        TeleportAgentToDifferentRegion(sp, regionHandle, position, lookAt, teleportFlags, out finalDestination);
++                        //TeleportAgentToDifferentRegion(sp, regionHandle, position, lookAt, teleportFlags, out finalDestination);
++                        TeleportAgentToDifferentRegion(sp, regionHandle, position, lookAt, teleportFlags, out finalDestination, client);    // by Fumi.Hax for NAPT
+                     }
+                     finally
+                     {
+@@ -576,7 +579,8 @@
+         /// <param name='finalDestination'></param>
+         private void TeleportAgentToDifferentRegion(
+             ScenePresence sp, ulong regionHandle, Vector3 position,
+-            Vector3 lookAt, uint teleportFlags, out GridRegion finalDestination)
++            Vector3 lookAt, uint teleportFlags, out GridRegion finalDestination, IClientAPI client)     // by Fumi.Hax for NAPT
++            //Vector3 lookAt, uint teleportFlags, out GridRegion finalDestination)
+         {
+             // Get destination region taking into account that the address could be an offset
+             //     region inside a varregion.
+@@ -628,7 +632,9 @@
+             //
+             // This is it
+             //
+-            DoTeleportInternal(sp, reg, finalDestination, position, lookAt, teleportFlags);
++            // by Fumi.Hax for NAPT
++            //DoTeleportInternal(sp, reg, finalDestination, position, lookAt, teleportFlags);
++            DoTeleportInternal(sp, reg, finalDestination, position, lookAt, teleportFlags, client);
+         }
+ 
+         // The teleport address could be an address in a subregion of a larger varregion.
+@@ -677,7 +683,8 @@
+         /// </summary>
+         public void DoTeleport(
+             ScenePresence sp, GridRegion reg, GridRegion finalDestination,
+-            Vector3 position, Vector3 lookAt, uint teleportFlags)
++            Vector3 position, Vector3 lookAt, uint teleportFlags, IClientAPI client)    // by Fumi.Hax for NAPT
++            //Vector3 position, Vector3 lookAt, uint teleportFlags)
+         {
+             // Record that this agent is in transit so that we can prevent simultaneous requests and do later detection
+             // of whether the destination region completes the teleport.
+@@ -692,7 +699,9 @@
+ 
+             try
+             {
+-                DoTeleportInternal(sp, reg, finalDestination, position, lookAt, teleportFlags);
++                // by Fumi.Hax for NAPT
++                //DoTeleportInternal(sp, reg, finalDestination, position, lookAt, teleportFlags);
++                DoTeleportInternal(sp, reg, finalDestination, position, lookAt, teleportFlags, client);
+             }
+             catch (Exception e)
+             {
+@@ -715,7 +724,8 @@
+         /// </summary>
+         private void DoTeleportInternal(
+             ScenePresence sp, GridRegion reg, GridRegion finalDestination,
+-            Vector3 position, Vector3 lookAt, uint teleportFlags)
++            Vector3 position, Vector3 lookAt, uint teleportFlags, IClientAPI client)    // by Fumi.Hax for NAPT
++            //Vector3 position, Vector3 lookAt, uint teleportFlags)
+         {
+             if (reg == null || finalDestination == null)
+             {
+@@ -742,6 +752,26 @@
+             // This may be a costly operation. The reg.ExternalEndPoint field is not a passive field,
+             // it's actually doing a lot of work.
+             IPEndPoint endPoint = finalDestination.ExternalEndPoint;
++
++            // by Fumi.Hax for NAPT
++            IPAddress clientAddress = null;
++            if (client!=null) {
++                IPEndPoint cpoint = client.RemoteEndPoint;
++                if (cpoint!=null) clientAddress = cpoint.Address;
++            }
++            if (clientAddress==null) {
++                uint circuitCode = sp.ControllingClient.CircuitCode;
++                clientAddress = NetworkUtil.GetIPfromString(sp.Scene.AuthenticateHandler.GetAgentCircuitData(circuitCode).IPAddress);
++            }
++            if (clientAddress!=null)
++            {
++                IPAddress intrnlAddress = finalDestination.InternalIPAddress;
++                IPAddress extrnlAddress = finalDestination.ExternalEndPoint.Address;
++                IPAddress regionAddress = sp.Scene.RegionInfo.ExternalEndPoint.Address;     // RegionInfo sourceRegion = sp.Scene.RegionInfo;
++                IPAddress effectAddress = NetworkUtil.GetEffectiveIP(clientAddress, intrnlAddress, extrnlAddress, regionAddress);
++                endPoint = new IPEndPoint(effectAddress, finalDestination.ExternalEndPoint.Port);
++            }
++
+             if (endPoint == null || endPoint.Address == null)
+             {
+                 sp.ControllingClient.SendTeleportFailed("Could not resolve destination Address");
+@@ -1524,7 +1554,8 @@
+             }
+ 
+             Teleport(sp, regionInfo.RegionHandle, uinfo.HomePosition, uinfo.HomeLookAt,
+-                (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaHome));
++                (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaHome), client);     // by Fumi.Hax for NAPT
++                //(uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaHome));
+ 
+             return true;
+         }
+@@ -1863,12 +1894,35 @@
+ 
+             string capsPath = neighbourRegion.ServerURI + CapsUtil.GetCapsSeedPath(agentcaps);
+ 
++            // by Fumi.Hax for NAPT
++            IPAddress effectAddress = null;
++            string serverURI = neighbourRegion.ServerURI;
++            uint circuitCode = agent.ControllingClient.CircuitCode;
++            IPAddress clientAddress = NetworkUtil.GetIPfromString(agent.Scene.AuthenticateHandler.GetAgentCircuitData(circuitCode).IPAddress);
++            if (clientAddress!=null)
++            {
++                IPAddress intrnlAddress = neighbourRegion.InternalIPAddress;
++                IPAddress extrnlAddress = neighbourRegion.ExternalEndPoint.Address;
++                if (!extrnlAddress.Equals(intrnlAddress))
++                {
++                    IPAddress regionAddress = agent.Scene.RegionInfo.ExternalEndPoint.Address;
++                    effectAddress = NetworkUtil.GetEffectiveIP(clientAddress, intrnlAddress, extrnlAddress, regionAddress);
++                }
++            }
++
+             m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Sending new CAPS seed url {0} to client {1}", capsPath, agent.UUID);
+ 
+             Vector3 vel2 = Vector3.Zero;
+             if((agent.m_crossingFlags & 2) != 0)
+                 vel2 = new Vector3(agent.Velocity.X, agent.Velocity.Y, 0);
+ 
++            // by Fumi.Hax for NAPT
++            IPEndPoint endPoint = endpoint; //neighbourRegion.ExternalEndPoint;
++            if (effectAddress!=null)
++            {
++                endPoint = new IPEndPoint(effectAddress, endpoint.Port);
++            }
++
+             if (m_eqModule != null)
+             {
+                 m_eqModule.CrossRegion(
+@@ -1997,6 +2051,19 @@
+             }
+ 
+             IPEndPoint external = region.ExternalEndPoint;
++
++            // by Fumi.Hax for NAPT
++            uint circuitCode = sp.ControllingClient.CircuitCode;
++            IPAddress clientAddress = NetworkUtil.GetIPfromString(sp.Scene.AuthenticateHandler.GetAgentCircuitData(circuitCode).IPAddress);
++            if (clientAddress!=null)
++            {
++                IPAddress intrnlAddress = region.InternalIPAddress;
++                IPAddress extrnlAddress = region.ExternalEndPoint.Address;
++                IPAddress regionAddress = sp.Scene.RegionInfo.ExternalEndPoint.Address;
++                IPAddress effectAddress = NetworkUtil.GetEffectiveIP(clientAddress, intrnlAddress, extrnlAddress, regionAddress);
++                external = new IPEndPoint(effectAddress, region.ExternalEndPoint.Port);
++            }
++
+             if (external != null)
+             {
+                 ScenePresence avatar = sp;
+@@ -2214,6 +2281,11 @@
+ 
+                 Util.FireAndForget(delegate
+                 {
++                    // by Fumi.Hax for NAPT
++                    uint circuitCode = sp.ControllingClient.CircuitCode;
++                    IPAddress clientAddress = NetworkUtil.GetIPfromString(sp.Scene.AuthenticateHandler.GetAgentCircuitData(circuitCode).IPAddress);
++                    IPAddress regionAddress = sp.Scene.RegionInfo.ExternalEndPoint.Address;
++
+                     int count = 0;
+                     IPEndPoint ipe;
+  
+@@ -2229,7 +2301,17 @@
+                             {
+                                 ipe = neighbour.ExternalEndPoint;
+                                 if (ipe != null)
++                                {
++                                    // by Fumi.Hax for NAPT
++                                    if (clientAddress!=null)
++                                    {
++                                        IPAddress intrnlAddress = neighbour.InternalIPAddress;
++                                        IPAddress extrnlAddress = neighbour.ExternalEndPoint.Address;
++                                        IPAddress effectAddress = NetworkUtil.GetEffectiveIP(clientAddress, intrnlAddress, extrnlAddress, regionAddress);
++                                        ipe = new IPEndPoint(effectAddress, neighbour.ExternalEndPoint.Port);
++                                    }
+                                     InformClientOfNeighbourAsync(sp, cagents[count], neighbour, ipe, true);
++                                }
+                                 else
+                                 {
+                                     m_log.DebugFormat("[ENTITY TRANSFER MODULE]:  lost DNS resolution for neighbour {0}", neighbour.ExternalHostName);
+diff -Nur OpenSim-/Region/CoreModules/Framework/EntityTransfer/HGEntityTransferModule.cs OpenSim/Region/CoreModules/Framework/EntityTransfer/HGEntityTransferModule.cs
+--- OpenSim-/Region/CoreModules/Framework/EntityTransfer/HGEntityTransferModule.cs	2025-04-06 17:46:12.656668368 +0900
++++ OpenSim/Region/CoreModules/Framework/EntityTransfer/HGEntityTransferModule.cs	2025-04-23 13:45:16.887425335 +0900
+@@ -531,7 +531,10 @@
+             m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: teleporting user {0} {1} home to {2} via {3}:{4}",
+                 aCircuit.firstname, aCircuit.lastname, finalDestination.RegionName, homeGatekeeper.ServerURI, homeGatekeeper.RegionName);
+ 
+-            DoTeleport(sp, homeGatekeeper, finalDestination, position, lookAt, (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaHome));
++            // Fumi.Hax for NAPT
++            //DoTeleport(sp, homeGatekeeper, finalDestination, position, lookAt, (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaHome));
++            DoTeleport(sp, homeGatekeeper, finalDestination, position, lookAt, (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaHome), client);
++
+             return true;
+         }
+ 
+@@ -614,7 +617,8 @@
+                     finalDestination.RegionSizeX, finalDestination.RegionSizeY, out Vector3 roffset))
+             {
+                 DoTeleport(sp, gatekeeper, finalDestination, roffset, lookAt,
+-                    (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaLandmark));
++                    (uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaLandmark), remoteClient);   // by Fumi.Hax for NAPT
++                    //(uint)(Constants.TeleportFlags.SetLastToTarget | Constants.TeleportFlags.ViaLandmark));
+                 return;
+             }
+             remoteClient.SendTeleportFailed("landmark region not found");
+diff -Nur OpenSim-/Region/Framework/Interfaces/IEntityTransferModule.cs OpenSim/Region/Framework/Interfaces/IEntityTransferModule.cs
+--- OpenSim-/Region/Framework/Interfaces/IEntityTransferModule.cs	2025-04-06 17:46:12.692668501 +0900
++++ OpenSim/Region/Framework/Interfaces/IEntityTransferModule.cs	2025-04-23 13:09:40.271621035 +0900
+@@ -52,7 +52,9 @@
+         /// <param name='position'></param>
+         /// <param name='lookAt'></param>
+         /// <param name='teleportFlags'></param>
+-        void Teleport(ScenePresence agent, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags);
++        // by Fumi.Hax for NAPT
++        //void Teleport(ScenePresence agent, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags);
++        void Teleport(ScenePresence agent, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags, IClientAPI client);
+ 
+         /// <summary>
+         /// Teleports the agent for the given client to their home destination.
+@@ -77,7 +79,8 @@
+         /// <param name='lookAt'></param>
+         /// <param name='teleportFlags'></param>
+         void DoTeleport(ScenePresence sp, GridRegion reg, GridRegion finalDestination,
+-            Vector3 position, Vector3 lookAt, uint teleportFlags);
++            Vector3 position, Vector3 lookAt, uint teleportFlags, IClientAPI client);       // by Fumi.Hax for NAPT
++            //Vector3 position, Vector3 lookAt, uint teleportFlags);
+ 
+         /// <summary>
+         /// Show whether the given agent is being teleported.
+diff -Nur OpenSim-/Region/Framework/Scenes/Scene.cs OpenSim/Region/Framework/Scenes/Scene.cs
+--- OpenSim-/Region/Framework/Scenes/Scene.cs	2025-04-22 16:03:10.385942295 +0900
++++ OpenSim/Region/Framework/Scenes/Scene.cs	2025-04-23 13:12:36.465330703 +0900
+@@ -4916,7 +4916,9 @@
+                 return;
+             }
+ 
+-            EntityTransferModule.Teleport(sp, regionHandle, position, lookat, teleportFlags);
++            // by Fumi.Hax for NAPT
++            //EntityTransferModule.Teleport(sp, regionHandle, position, lookat, teleportFlags);
++            EntityTransferModule.Teleport(sp, regionHandle, position, lookat, teleportFlags, remoteClient);
+         }
+ 
+         /// <summary>
+@@ -4940,7 +4942,9 @@
+             if (sp is null || sp.IsDeleted || sp.IsInTransit)
+                 return;
+ 
+-            EntityTransferModule.Teleport(sp, regionHandle, position, lookAt, teleportFlags);
++            // by Fumi.Hax for NAPT
++            //EntityTransferModule.Teleport(sp, regionHandle, position, lookAt, teleportFlags);
++            EntityTransferModule.Teleport(sp, regionHandle, position, lookAt, teleportFlags, remoteClient);
+         }
+ 
+         public void RequestTeleportLandmark(IClientAPI remoteClient, AssetLandmark lm, Vector3 lookAt)
+diff -Nur OpenSim-/Server/Handlers/Hypergrid/HypergridHandlers.cs OpenSim/Server/Handlers/Hypergrid/HypergridHandlers.cs
+--- OpenSim-/Server/Handlers/Hypergrid/HypergridHandlers.cs	2025-04-06 17:46:12.795668883 +0900
++++ OpenSim/Server/Handlers/Hypergrid/HypergridHandlers.cs	2025-04-23 13:13:24.739525144 +0900
+@@ -119,6 +119,7 @@
+                 hash["hostname"] = regInfo.ExternalHostName;
+                 hash["http_port"] = regInfo.HttpPort.ToString();
+                 hash["internal_port"] = regInfo.InternalEndPoint.Port.ToString();
++                hash["internal_ip_address"] = regInfo.InternalIPAddress.ToString();     // by Fumi.Hax for NAPT
+                 hash["server_uri"] = regInfo.ServerURI;
+             }
+ 
+diff -Nur OpenSim-/Server/Handlers/Hypergrid/UserAgentServerConnector.cs OpenSim/Server/Handlers/Hypergrid/UserAgentServerConnector.cs
+--- OpenSim-/Server/Handlers/Hypergrid/UserAgentServerConnector.cs	2025-04-06 17:46:12.795668883 +0900
++++ OpenSim/Server/Handlers/Hypergrid/UserAgentServerConnector.cs	2025-04-23 13:14:21.783754913 +0900
+@@ -141,6 +141,7 @@
+                 hash["http_port"] = regInfo.HttpPort.ToString();
+                 hash["server_uri"] = regInfo.ServerURI;
+                 hash["internal_port"] = regInfo.InternalEndPoint.Port.ToString();
++                hash["internal_ip_address"] = regInfo.InternalIPAddress.ToString();     // by Fumi.Hax for NAPT
+                 hash["position"] = position.ToString();
+                 hash["lookAt"] = lookAt.ToString();
+             }
+diff -Nur OpenSim-/Services/Connectors/Hypergrid/GatekeeperServiceConnector.cs OpenSim/Services/Connectors/Hypergrid/GatekeeperServiceConnector.cs
+--- OpenSim-/Services/Connectors/Hypergrid/GatekeeperServiceConnector.cs	2025-04-06 17:46:12.804668916 +0900
++++ OpenSim/Services/Connectors/Hypergrid/GatekeeperServiceConnector.cs	2025-04-23 13:15:10.078949437 +0900
+@@ -326,6 +326,12 @@
+                         //m_log.Debug(">> HERE, server_uri: " + region.ServerURI);
+                     }
+ 
++                    // by Fumi.Hax for NAPT
++                    if (hash["internal_ip_address"] != null)
++                    {
++                        region.InternalIPAddress = NetworkUtil.GetIPfromString((string)hash["internal_ip_address"]);
++                    }
++
+                     // Successful return
+                     return region;
+                 }
+diff -Nur OpenSim-/Services/Connectors/Hypergrid/UserAgentServiceConnector.cs OpenSim/Services/Connectors/Hypergrid/UserAgentServiceConnector.cs
+--- OpenSim-/Services/Connectors/Hypergrid/UserAgentServiceConnector.cs	2025-04-06 17:46:12.804668916 +0900
++++ OpenSim/Services/Connectors/Hypergrid/UserAgentServiceConnector.cs	2025-04-23 13:15:58.939146235 +0900
+@@ -254,6 +254,12 @@
+             if (hash["lookAt"] != null)
+                 Vector3.TryParse((string)hash["lookAt"], out lookAt);
+ 
++            // by Fumi.Hax for NAPT
++            if (hash["internal_ip_address"] != null)
++            {
++                region.InternalIPAddress = NetworkUtil.GetIPfromString((string)hash["internal_ip_address"]);
++            }
++
+             // Successful return
+             return region;
+         }
+diff -Nur OpenSim-/Services/Interfaces/IGridService.cs OpenSim/Services/Interfaces/IGridService.cs
+--- OpenSim-/Services/Interfaces/IGridService.cs	2025-04-06 17:46:12.810668938 +0900
++++ OpenSim/Services/Interfaces/IGridService.cs	2025-04-23 13:22:51.384810292 +0900
+@@ -217,6 +217,8 @@
+ 
+         protected IPEndPoint m_internalEndPoint;
+ 
++        protected IPAddress  m_internalIPAddress = null;    // by Fumi.Hax for NAPT
++
+         /// <summary>
+         /// The co-ordinate of this region in region units.
+         /// </summary>
+@@ -270,6 +272,9 @@
+         public string RegionSecret = string.Empty;
+         public string Token = string.Empty;
+ 
++        // by Fumi.Hax for NAPT
++        private string m_dbipcolumn = "Token";
++
+         public GridRegion()
+         {
+             RegionSizeX = (int)Constants.RegionSize;
+@@ -294,6 +299,7 @@
+             RegionSizeY = (int)ConvertFrom.RegionSizeY;
+             m_internalEndPoint = ConvertFrom.InternalEndPoint;
+             m_externalHostName = ConvertFrom.ExternalHostName;
++            m_internalIPAddress = ConvertFrom.InternalIPAddress;    // by Fumi.Hax for NAPT
+             HttpPort = ConvertFrom.HttpPort;
+             RegionID = ConvertFrom.RegionID;
+             ServerURI = ConvertFrom.ServerURI;
+@@ -315,6 +321,7 @@
+             RegionSizeY = ConvertFrom.RegionSizeY;
+             m_internalEndPoint = ConvertFrom.InternalEndPoint;
+             m_externalHostName = ConvertFrom.ExternalHostName;
++            m_internalIPAddress = ConvertFrom.InternalIPAddress;    // by Fumi.Hax for NAPT
+             HttpPort = ConvertFrom.HttpPort;
+             RegionID = ConvertFrom.RegionID;
+             ServerURI = ConvertFrom.ServerURI;
+@@ -402,6 +409,13 @@
+             if (kvp.ContainsKey("Token"))
+                 Token = kvp["Token"].ToString();
+ 
++            // by Fumi.Hax for NAPT
++            if (kvp.ContainsKey(m_dbipcolumn))
++            {
++                InternalIPAddress = NetworkUtil.GetIPfromString(kvp[m_dbipcolumn].ToString());
++                if (InternalIPAddress.ToString()=="0.0.0.0") InternalIPAddress = ExternalEndPoint.Address;
++            }
++
+             // m_log.DebugFormat("{0} New GridRegion. id={1}, loc=<{2},{3}>, size=<{4},{5}>",
+             //                         LogHeader, RegionID, RegionLocX, RegionLocY, RegionSizeX, RegionSizeY);
+         }
+@@ -431,6 +445,9 @@
+             kvp["Token"] = Token.ToString();
+             // Maturity doesn't seem to exist in the DB
+ 
++            // by Fumi.Hax for NAPT  [* if Robust server, comment out this]
++            if (NetworkUtil.IsPrivateSubnet(InternalIPAddress)) kvp[m_dbipcolumn] = InternalIPAddress.ToString();
++
+             return kvp;
+         }
+ 
+@@ -487,5 +504,18 @@
+         {
+             get { return Util.UIntsToLong((uint)RegionLocX, (uint)RegionLocY); }
+         }
++
++        // by Fumi.Hax for NAPT
++        public IPAddress InternalIPAddress
++        {
++            get {
++                if (m_internalIPAddress==null) {
++                    m_internalIPAddress = m_internalEndPoint.Address;
++                    if (m_internalIPAddress.ToString()=="0.0.0.0") m_internalIPAddress = ExternalEndPoint.Address;
++                }
++                return m_internalIPAddress;
++            }
++            set { m_internalIPAddress = value; }
++        }
+     }
+ }
+diff -Nur OpenSim-/Services/LLLoginService/LLLoginResponse.cs OpenSim/Services/LLLoginService/LLLoginResponse.cs
+--- OpenSim-/Services/LLLoginService/LLLoginResponse.cs	2025-04-06 17:46:12.813668950 +0900
++++ OpenSim/Services/LLLoginService/LLLoginResponse.cs	2025-04-23 13:25:27.931443074 +0900
+@@ -266,7 +266,8 @@
+             FillOutHomeData(pinfo, home);
+             LookAt = String.Format("[r{0},r{1},r{2}]", lookAt.X, lookAt.Y, lookAt.Z);
+ 
+-            FillOutRegionData(destination);
++            //FillOutRegionData(destination);
++            FillOutRegionData(destination, clientIP);   // by Fumi.Hax for NAPT
+             m_log.DebugFormat("[LOGIN RESPONSE] LLLoginResponse create. sizeX={0}, sizeY={1}", RegionSizeX, RegionSizeY);
+ 
+             FillOutSeedCap(aCircuit, destination, clientIP);
+@@ -385,11 +386,18 @@
+ 
+         }
+ 
+-        private void FillOutRegionData(GridRegion destination)
++        // by Fumi.Hax for NAPT
++        //private void FillOutRegionData(GridRegion destination)
++        private void FillOutRegionData(GridRegion destination, IPEndPoint clientIP)
+         {
+             IPEndPoint endPoint = destination.ExternalEndPoint;
+             if (endPoint == null) return;
+-            SimAddress = endPoint.Address.ToString();
++            // by Fumi.Hax for NAPT
++            //SimAddress = endPoint.Address.ToString();
++            IPAddress extAddress = NetworkUtil.GetIPfromString(destination.ExternalHostName);
++            IPAddress simAddress = NetworkUtil.GetEffectiveIP(clientIP.Address, destination.InternalIPAddress, extAddress, null);
++            SimAddress = simAddress.ToString();
++            //
+             SimPort = (uint)endPoint.Port;
+             RegionX = (uint)destination.RegionLocX;
+             RegionY = (uint)destination.RegionLocY;

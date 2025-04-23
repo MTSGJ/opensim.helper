@@ -1,0 +1,54 @@
+diff -Nur OpenSim.orig/Region/CoreModules/World/Land/LandManagementModule.cs OpenSim/Region/CoreModules/World/Land/LandManagementModule.cs
+--- OpenSim.orig/Region/CoreModules/World/Land/LandManagementModule.cs	2021-08-05 13:24:02.581625258 +0900
++++ OpenSim/Region/CoreModules/World/Land/LandManagementModule.cs	2021-08-05 13:24:39.000623716 +0900
+@@ -538,6 +538,10 @@
+             if (avatar.IsChildAgent)
+                 return;
+ 
++            // by Fumi.Hax
++            ILandObject over = GetLandObject(avatar.AbsolutePosition.X, avatar.AbsolutePosition.Y);
++            SendLandUpdate(avatar, over);
++
+             if ( m_allowedForcefulBans && m_showBansLines && !m_scene.RegionInfo.EstateSettings.TaxFree)
+                 SendOutNearestBanLine(avatar.ControllingClient);
+         }
+diff -Nur OpenSim.orig/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs OpenSim/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs
+--- OpenSim.orig/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs	2021-08-05 13:24:02.582625266 +0900
++++ OpenSim/Region/OptionalModules/Avatar/XmlRpcGroups/XmlRpcGroupsServicesConnectorModule.cs	2021-08-05 13:24:39.001623726 +0900
+@@ -1150,7 +1150,8 @@
+ 
+             using (Stream stream = request.GetRequestStream())
+             {
+-                using (XmlTextWriter xml = new XmlTextWriter(stream, Encoding.ASCII))
++                //using (XmlTextWriter xml = new XmlTextWriter(stream, Encoding.ASCII))
++                using (XmlTextWriter xml = new XmlTextWriter(stream, Encoding.UTF8))	// Fumi.Hax
+                 {
+                     _serializer.Serialize(xml, this);
+                     xml.Flush();
+diff -Nur OpenSim.orig/Region/OptionalModules/UserStatistics/WebStatsModule.cs OpenSim/Region/OptionalModules/UserStatistics/WebStatsModule.cs
+--- OpenSim.orig/Region/OptionalModules/UserStatistics/WebStatsModule.cs	2021-08-05 13:24:02.583625280 +0900
++++ OpenSim/Region/OptionalModules/UserStatistics/WebStatsModule.cs	2021-08-05 13:24:39.002623732 +0900
+@@ -144,7 +144,9 @@
+                 m_scenes.Add(scene);
+                 updateLogMod = m_scenes.Count * 2;
+ 
+-                m_simstatsCounters.Add(scene.RegionInfo.RegionID, new USimStatsData(scene.RegionInfo.RegionID));
++                // Fumi.Hax
++                if (!m_simstatsCounters.ContainsKey(scene.RegionInfo.RegionID)) 
++                    m_simstatsCounters.Add(scene.RegionInfo.RegionID, new USimStatsData(scene.RegionInfo.RegionID));
+ 
+                 scene.EventManager.OnRegisterCaps += OnRegisterCaps;
+                 scene.EventManager.OnDeregisterCaps += OnDeRegisterCaps;
+diff -Nur OpenSim.orig/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs OpenSim/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs
+--- OpenSim.orig/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs	2021-08-05 13:24:02.583625280 +0900
++++ OpenSim/Server/Handlers/Freeswitch/FreeswitchServerConnector.cs	2021-08-05 13:24:39.002623732 +0900
+@@ -105,7 +105,8 @@
+                 if (s.Trim() != "")
+                 {
+                     string [] nvp = s.Split(new Char [] {'='});
+-                    bodyParams.Add(HttpUtility.UrlDecode(nvp[0]), HttpUtility.UrlDecode(nvp[1]));
++                    if (!bodyParams.ContainsKey(nvp[0]))  // Fumi.Hax
++                        bodyParams.Add(HttpUtility.UrlDecode(nvp[0]), HttpUtility.UrlDecode(nvp[1]));
+                 }
+             }
+ 

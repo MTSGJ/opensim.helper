@@ -1,0 +1,49 @@
+mkdir -p opensim/OpenSim/Region/Physics/Manager
+mkdir -p opensim/OpenSim/Region/Physics/OdePlugin
+mkdir -p opensim/OpenSim/Region/Framework/Scenes
+mkdir -p opensim/OpenSim/Region/ClientStack/LindenUDP
+#mkdir -p opensim/OpenSim/Framework/Capabilities
+mkdir -p opensim/bin
+
+mkdir -p opensim-/OpenSim/Region/Physics/Manager
+mkdir -p opensim-/OpenSim/Region/Physics/OdePlugin
+mkdir -p opensim-/OpenSim/Region/Framework/Scenes
+mkdir -p opensim-/OpenSim/Region/ClientStack/LindenUDP
+#mkdir -p opensim-/OpenSim/Framework/Capabilities
+mkdir -p opensim-/bin
+
+
+# Script
+mkdir -p opensim/OpenSim/Region/ScriptEngine/Shared/Api/Implementation
+mkdir -p opensim/OpenSim/Region/ScriptEngine/Shared/Api/Interface
+mkdir -p opensim/OpenSim/Region/ScriptEngine/Shared/Api/Runtime
+
+mkdir -p opensim-/OpenSim/Region/ScriptEngine/Shared/Api/Implementation
+mkdir -p opensim-/OpenSim/Region/ScriptEngine/Shared/Api/Interface
+mkdir -p opensim-/OpenSim/Region/ScriptEngine/Shared/Api/Runtime
+
+#
+mkdir -p opensim/OpenSim/Region/CoreModules/Scripting/BitmapRender
+mkdir -p opensim-/OpenSim/Region/CoreModules/Scripting/BitmapRender
+
+
+#OpenSim/Services/AuthenticationService/PasswordAuthenticationService.cs
+mkdir -p opensim/OpenSim/Services/AuthenticationService
+mkdir -p opensim-/OpenSim/Services/AuthenticationService
+
+
+# 0.7
+mkdir -p opensim/OpenSim/Services/PresenceService
+mkdir -p opensim-/OpenSim/Services/PresenceService
+mkdir -p opensim/OpenSim/Services/Interfaces
+mkdir -p opensim-/OpenSim/Services/Interfaces
+mkdir -p opensim/OpenSim/Region/CoreModules/World/WorldMap
+mkdir -p opensim-/OpenSim/Region/CoreModules/World/WorldMap
+mkdir -p opensim/OpenSim/Region/Physics/Meshing 
+mkdir -p opensim-/OpenSim/Region/Physics/Meshing
+
+mkdir -p opensim/OpenSim/ConsoleClient
+mkdir -p opensim-/OpenSim/ConsoleClient
+
+mkdir -p opensim/OpenSim/Region/CoreModules/Avatar/InstantMessage
+mkdir -p opensim-/OpenSim/Region/CoreModules/Avatar/InstantMessage
