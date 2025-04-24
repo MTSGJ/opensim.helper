@@ -61,19 +61,20 @@ if ($method == '/RetrieveMessages/') {
         $errno = $DbLink->Errno;
     }
 
-    echo '<?xml version="1.0" encoding="utf-8"?>';
-    echo '<ArrayOfGridInstantMessage xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">';
+    $response  = '<?xml version="1.0" encoding="utf-8"?>';
+    $response .= '<ArrayOfGridInstantMessage xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">';
 
     if ($errno==0) {
         while(list($message) = $DbLink->next_record()) {
-            echo $message;
+            $response .= $message;
         }
     }
-    echo '</ArrayOfGridInstantMessage>';
+    $response .= '</ArrayOfGridInstantMessage>';
 
     if ($errno==0) {
         $DbLink->query("DELETE FROM ".OFFLINE_MESSAGE_TBL." WHERE to_uuid='".$agent_id."'");
     }
-    flush();
+
+    print $response;
     exit;
 }
