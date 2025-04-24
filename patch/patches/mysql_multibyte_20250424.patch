@@ -1,0 +1,61 @@
+diff -Nur OpenSim-/Data/MySQL/MySQLSimulationData.cs OpenSim/Data/MySQL/MySQLSimulationData.cs
+--- OpenSim-/Data/MySQL/MySQLSimulationData.cs	2025-04-06 17:46:12.491667757 +0900
++++ OpenSim/Data/MySQL/MySQLSimulationData.cs	2025-04-24 15:40:49.430779934 +0900
+@@ -1009,8 +1009,21 @@
+                 prim.Name = (string)row["Name"];
+             else
+                 prim.Name = String.Empty;
++
++            // by Takumi.Hiratani for Restore MultiByte Text Data from DB
+             // Various text fields
+-            prim.Text = (string)row["Text"];
++            //prim.Text = (string)row["Text"];
++            string text = (string)row["Text"];
++            string mgccode = prim.UUID.ToString();
++            if (text.StartsWith(mgccode)) {
++                string base64 = text.Substring(mgccode.Length);
++                string utf8String = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
++                prim.Text = utf8String;
++            }
++            else {
++                prim.Text = text;
++            }
++            //
+             prim.Color = Color.FromArgb((int)row["ColorA"],
+                                         (int)row["ColorR"],
+                                         (int)row["ColorG"],
+@@ -1455,8 +1468,33 @@
+             cmd.Parameters.AddWithValue("Name", prim.Name);
+             cmd.Parameters.AddWithValue("SceneGroupID", sceneGroupID.ToString());
+                 // the UUID of the root part for this SceneObjectGroup
++
++            // by Takumi.Hiratani and Fumi.Hax for Save MultiByte Text Data to DB
+             // various text fields
+-            cmd.Parameters.AddWithValue("Text", prim.Text);
++            //cmd.Parameters.AddWithValue("Text", prim.Text);
++            string primText = "";
++            bool multibyte = false;     // A marker to indicate whether a multibyte character was found
++            string mgccode = prim.UUID.ToString();
++            if (prim.Text.StartsWith(mgccode)) {
++                primText = prim.Text.Substring(mgccode.Length);     // for SQL Injection
++            }
++            else {
++                primText = prim.Text;
++            }
++            // check MultiByte
++            foreach (char cc in primText) {
++                int byteCount = Encoding.UTF8.GetByteCount(new char[] { cc });
++                if (byteCount>1) {
++                    multibyte = true;
++                    break;
++                }
++            }
++            if (multibyte) {
++                string base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(primText));
++                primText = mgccode + base64;
++            }
++            cmd.Parameters.AddWithValue("Text", primText);
++
+             cmd.Parameters.AddWithValue("ColorR", prim.Color.R);
+             cmd.Parameters.AddWithValue("ColorG", prim.Color.G);
+             cmd.Parameters.AddWithValue("ColorB", prim.Color.B);
