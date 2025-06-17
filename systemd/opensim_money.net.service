@@ -1,0 +1,26 @@
+# /usr/lib/systemd/system/opensim_money.net.service with screen 
+#         v.1.0      by Fumi.Iseki
+
+[Unit]
+Description = MoneyServer for OpenSimulator
+After = opensim_robust.net.service
+
+[Service]
+Environment = OPENSIM_DIR=/usr/local/opensim_server
+Environment = OPENSIM_COM=MoneyServer
+Environment = SCRN_OS_ID=opensim_money
+
+Type = forking
+User = root
+LimitSTACK = infinity
+
+ExecStart = /usr/bin/bash -c 'cd ${OPENSIM_DIR}/bin && /usr/bin/screen -dmLS ${SCRN_OS_ID} ${OPENSIM_DIR}/bin/${OPENSIM_COM}'
+ExecStop  = /usr/bin/screen -S ${SCRN_OS_ID} -X stuff "shutdown\n"
+
+KillSignal = SIGCONT
+TimeoutStopSec = 120s
+
+Restart = always
+
+[Install]
+WantedBy = multi-user.target

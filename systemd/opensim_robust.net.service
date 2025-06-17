@@ -1,0 +1,29 @@
+# /usr/lib/systemd/system/opensim_robust.net.service with screen
+#         v.1.0      by Fumi.Iseki
+#
+
+[Unit]
+Description = Robust Server of OpenSimulator
+#After = network-online.target
+After = mysqld.service
+
+[Service]
+Environment = OPENSIM_DIR=/usr/local/opensim_server
+Environment = OPENSIM_COM=Robust
+Environment = SCRN_OS_ID=opensim_robust
+
+Type = forking
+User = root
+LimitSTACK = infinity
+
+ExecStart = /usr/bin/bash -c 'cd ${OPENSIM_DIR}/bin && /usr/bin/screen -dmLS ${SCRN_OS_ID} ${OPENSIM_DIR}/bin/${OPENSIM_COM}'
+ExecStop  = /usr/bin/screen -S ${SCRN_OS_ID} -X stuff "shutdown\n"
+
+# SIGTERM の代わり．SIGTERM で screen自体が終了するため．
+KillSignal = SIGCONT
+TimeoutStopSec = 120s
+
+Restart = always
+
+[Install]
+WantedBy = multi-user.target
