@@ -1,0 +1,32 @@
+# /usr/lib/systemd/system/opensim@.service with screen
+#         v.1.1      by Fumi.Iseki
+#
+
+[Unit]
+Description = OpenSimulator Region Server %i
+After = network-online.target
+
+[Service]
+Environment = OPENSIM_DIR=/usr/local/opensim/bin_%i
+Environment = OPENSIM_COM=OpenSim
+Environment = SCRN_OS_ID=opensim_%i
+
+Environment = DOTNET_GCServer=1
+Environment = DOTNET_ThreadPool_MinThreads=8
+
+Type = forking
+User = root
+Nice = -5
+LimitSTACK = infinity
+
+ExecStart = /usr/bin/bash -c 'cd ${OPENSIM_DIR} && /usr/bin/screen -dmLS ${SCRN_OS_ID} ${OPENSIM_DIR}/${OPENSIM_COM}'
+ExecStop  = /usr/bin/screen -S ${SCRN_OS_ID} -X stuff "shutdown\n"
+
+# SIGTERM の代わり．SIGTERM で screen自体が終了するため．
+KillSignal = SIGCONT
+TimeoutStopSec = 120s
+
+Restart = always
+
+[Install]
+WantedBy = multi-user.target
