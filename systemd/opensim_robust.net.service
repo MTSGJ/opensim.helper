@@ -14,6 +14,7 @@ Environment = SCRN_OS_ID=opensim_robust
 
 Type = forking
 User = root
+Nice = -5
 LimitSTACK = infinity
 
 ExecStart = /usr/bin/bash -c 'cd ${OPENSIM_DIR}/bin && /usr/bin/screen -dmLS ${SCRN_OS_ID} ${OPENSIM_DIR}/bin/${OPENSIM_COM}'
